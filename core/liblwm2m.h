@@ -118,13 +118,44 @@ int lwm2m_boolToPlainText(bool data, char ** bufferP);
 
 #define LWM2M_TLV_HEADER_MAX_LENGTH 6
 
+#define LWM2M_TYPE_RESSOURCE            0x00
+#define LWM2M_TYPE_MULTIPLE_RESSOURCE   0x01
+#define LWM2M_TYPE_RESSOURCE_INSTANCE   0x02
+#define LWM2M_TYPE_OBJECT_INSTANCE      0x03
+#define LWM2M_TYPE_MASK                 0x03
+
+/*
+ * Bitmask for the lwm2m_tlv_t::flag
+ * LWM2M_TLV_FLAG_STATIC_DATA specifies that lwm2m_tlv_t::value
+ * points to static memory and must no be freeed by the caller.
+ * LWM2M_TLV_FLAG_TEXT_FORMAT specifies that lwm2m_tlv_t::value
+ * is expressed or requested in plain text format.
+ */
+#define LWM2M_TLV_FLAG_STATIC_DATA  0x01
+#define LWM2M_TLV_FLAG_TEXT_FORMAT  0x02
+
 typedef enum
 {
-    TLV_OBJECT_INSTANCE,
-    TLV_RESSOURCE_INSTANCE,
-    TLV_MULTIPLE_INSTANCE,
-    TLV_RESSOURCE
+    TLV_OBJECT_INSTANCE = LWM2M_TYPE_OBJECT_INSTANCE,
+    TLV_RESSOURCE_INSTANCE = LWM2M_TYPE_RESSOURCE_INSTANCE,
+    TLV_MULTIPLE_INSTANCE = LWM2M_TYPE_MULTIPLE_RESSOURCE,
+    TLV_RESSOURCE = LWM2M_TYPE_RESSOURCE
 } lwm2m_tlv_type_t;
+
+typedef struct
+{
+    uint8_t     flags;
+    uint8_t     type;
+    uint16_t    id;
+    size_t      length;
+    uint8_t *   value;
+} lwm2m_tlv_t;
+
+lwm2m_tlv_t * lwm2m_tlv_new(int size);
+int lwm2m_tlv_parse(char * buffer, size_t bufferLen, lwm2m_tlv_t ** dataP);
+int lwm2m_tlv_serialize(int size, lwm2m_tlv_t * tlvP, char ** bufferP);
+void lwm2m_tlv_free(int size, lwm2m_tlv_t * tlvP);
+
 
 /*
  * These utility functions fill the buffer with a TLV record containing

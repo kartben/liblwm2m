@@ -65,17 +65,67 @@ coap_status_t handle_dm_request(lwm2m_context_t * contextP,
         break;
     case COAP_POST:
         {
-            result = object_create_execute(contextP, uriP, message->payload, message->payload_len);
+            if (!LWM2M_URI_IS_SET_INSTANCE(uriP))
+            {
+                result = object_create(contextP, uriP, message->payload, message->payload_len);
+                if (result == COAP_201_CREATED)
+                {
+                    //longest uri is /65535/65535 =12 + 1 (null) chars
+                    char location_path[12] = "";
+                    //instanceId expected
+                    if ((uriP->flag & LWM2M_URI_FLAG_INSTANCE_ID) == 0)
+                    {
+                        result = COAP_500_INTERNAL_SERVER_ERROR;
+                        break;
+                    }
+
+                    if (sprintf(location_path, "/%d/%d", uriP->objectId, uriP->instanceId) < 0)
+                    {
+                        result = COAP_500_INTERNAL_SERVER_ERROR;
+                        break;
+                    }
+                    coap_set_header_location_path(response, location_path);
+                }
+            }
+            else if (!LWM2M_URI_IS_SET_RESOURCE(uriP))
+            {
+                if (object_isInstanceNew(contextP, uriP->objectId, uriP->instanceId))
+                {
+                    result = object_create(contextP, uriP, message->payload, message->payload_len);
+                }
+                else
+                {
+                    result = object_write(contextP, uriP, message->payload, message->payload_len);
+                }
+            }
+            else
+            {
+                result = object_execute(contextP, uriP, message->payload, message->payload_len);
+            }
         }
         break;
     case COAP_PUT:
         {
-            result = object_write(contextP, uriP, message->payload, message->payload_len);
+            if (LWM2M_URI_IS_SET_INSTANCE(uriP) && LWM2M_URI_IS_SET_RESOURCE(uriP))
+            {
+                result = object_write(contextP, uriP, message->payload, message->payload_len);
+            }
+            else
+            {
+                result = BAD_REQUEST_4_00;
+            }
         }
         break;
     case COAP_DELETE:
         {
-            result = object_delete(contextP, uriP);
+            if (LWM2M_URI_IS_SET_INSTANCE(uriP) && !LWM2M_URI_IS_SET_RESOURCE(uriP))
+            {
+                result = object_delete(contextP, uriP);
+            }
+            else
+            {
+                result = BAD_REQUEST_4_00;
+            }
         }
         break;
     default:
@@ -107,6 +157,35 @@ static void dm_result_callback(lwm2m_transaction_t * transacP,
     else
     {
         coap_packet_t * packet = (coap_packet_t *)message;
+
+        //if packet is a CREATE response and the instanceId was assigned by the client
+        if (packet->code == COAP_201_CREATED
+         && packet->location_path != NULL)
+        {
+            char * locationString = NULL;
+            int result = 0;
+            lwm2m_uri_t locationUri;
+
+            locationString = coap_get_multi_option_as_string(packet->location_path);
+            if (locationString == NULL)
+            {
+                fprintf(stderr, "Error: coap_get_multi_option_as_string() failed for Location_path option in dm_result_callback()\n");
+                return;
+            }
+
+            result = lwm2m_stringToUri(locationString, strlen(locationString), &locationUri);
+            if (result == 0)
+            {
+                fprintf(stderr, "Error: lwm2m_stringToUri() failed for Location_path option in dm_result_callback()\n");
+                lwm2m_free(locationString);
+                return;
+            }
+
+            ((dm_data_t*)transacP->userData)->uri.instanceId = locationUri.instanceId;
+            ((dm_data_t*)transacP->userData)->uri.flag = locationUri.flag;
+
+            lwm2m_free(locationString);
+        }
 
         dataP->callback(((lwm2m_client_t*)transacP->peerP)->internalID,
                         &dataP->uri,
@@ -189,9 +268,18 @@ int lwm2m_dm_write(lwm2m_context_t * contextP,
         return COAP_400_BAD_REQUEST;
     }
 
-    return prv_make_operation(contextP, clientID, uriP,
-                              COAP_PUT, buffer, length,
-                              callback, userData);
+    if (LWM2M_URI_IS_SET_RESOURCE(uriP))
+    {
+        return prv_make_operation(contextP, clientID, uriP,
+                                  COAP_PUT, buffer, length,
+                                  callback, userData);
+    }
+    else
+    {
+        return prv_make_operation(contextP, clientID, uriP,
+                                  COAP_POST, buffer, length,
+                                  callback, userData);
+    }
 }
 
 int lwm2m_dm_execute(lwm2m_context_t * contextP,
