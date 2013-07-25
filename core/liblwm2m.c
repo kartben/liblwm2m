@@ -262,6 +262,10 @@ static coap_status_t handle_request(lwm2m_context_t * contextP,
             result = object_read(contextP, uriP, &buffer, &length);
             if (NULL != buffer)
             {
+            	// HACK
+            	if (uriP->objID == 2048 && uriP->resID == 2)
+            		coap_set_header_content_type(response, APPLICATION_LINK_FORMAT);
+
                 coap_set_payload(response, buffer, length);
                 // lwm2m_handle_packet will free buffer
             }
@@ -477,6 +481,7 @@ int lwm2m_handle_packet(lwm2m_context_t * contextP,
         /* Reuse input buffer for error message. */
         coap_init_message(message, COAP_TYPE_ACK, coap_error_code, message->mid);
         coap_set_payload(message, coap_error_message, strlen(coap_error_message));
+
         bufferLen = coap_serialize_message(message, buffer);
         if (0 != bufferLen)
         {
