@@ -452,9 +452,16 @@ static uint8_t prv_device_read(lwm2m_uri_t * uriP,
             return COAP_500_INTERNAL_SERVER_ERROR;
         }
     case 10:
-        *lengthP = lwm2m_int8ToPlainText(PRV_MEMORY_FREE, bufferP);
-        if (0 != *lengthP)
+        ;
+        char availRAM[10] = "";
+        FILE *fp = popen("free | grep Mem | awk '{print 100 - $3/$2 * 100.0}'", "r");
+        fscanf(fp, "%s", availRAM);
+        pclose(fp);
+
+        *bufferP = strdup(availRAM);
+        if (NULL != *bufferP)
         {
+            *lengthP = strlen(*bufferP);
             return COAP_205_CONTENT;
         }
         else
@@ -569,6 +576,7 @@ static uint8_t prv_device_execute(lwm2m_uri_t * uriP,
     {
     case 4:
         fprintf(stdout, "\n\t REBOOT\r\n\n");
+	system("reboot");
         return COAP_204_CHANGED;
     case 5:
         fprintf(stdout, "\n\t FACTORY RESET\r\n\n");
