@@ -310,10 +310,18 @@ static uint8_t prv_device_read(lwm2m_uri_t * uriP,
         }
     }
     // else a simple switch structure is used to respond at the specified resource asked
+    FILE *fp;
     switch (uriP->resourceId)
     {
     case 0:
-        *bufferP = strdup(PRV_MANUFACTURER);
+        ;
+        char manufacturer[50] = "";
+        fp = popen("head -n 12 /proc/cpuinfo | tail -1 | awk -F: '{print $2}'", "r");
+        fscanf(fp, "%s", manufacturer);
+        pclose(fp);
+
+        *bufferP = strdup(manufacturer);
+
         if (NULL != *bufferP)
         {
             *lengthP = strlen(*bufferP);
@@ -335,7 +343,14 @@ static uint8_t prv_device_read(lwm2m_uri_t * uriP,
             return COAP_500_INTERNAL_SERVER_ERROR;
         }
     case 2:
-        *bufferP = strdup(PRV_SERIAL_NUMBER);
+        ;
+        char serial[20] = "";
+        fp = popen("grep -Po '^Serial\\s*:\\s*\\K[[:xdigit:]]{16}' /proc/cpuinfo", "r");
+        fscanf(fp, "%s", serial);
+        pclose(fp);
+
+        *bufferP = strdup(serial);
+
         if (NULL != *bufferP)
         {
             *lengthP = strlen(*bufferP);
@@ -454,7 +469,7 @@ static uint8_t prv_device_read(lwm2m_uri_t * uriP,
     case 10:
         ;
         char availRAM[10] = "";
-        FILE *fp = popen("free | grep Mem | awk '{print 100 - $3/$2 * 100.0}'", "r");
+        fp = popen("free | grep Mem | awk '{print 100 - $3/$2 * 100.0}'", "r");
         fscanf(fp, "%s", availRAM);
         pclose(fp);
 

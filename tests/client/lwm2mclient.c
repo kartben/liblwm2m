@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, handle_sigint);
 
-    connList = connection_create(connList, sock, "localhost", LWM2M_STANDARD_PORT);
+    connList = connection_create(connList, sock, "iot.eclipse.org", LWM2M_STANDARD_PORT);
     if (connList == NULL)
     {
         fprintf(stderr, "Connection creation failed.\r\n");
